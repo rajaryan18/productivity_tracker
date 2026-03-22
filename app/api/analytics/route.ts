@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DatabaseFactory } from "@/lib/data/DatabaseFactory";
 import { TimeSegment } from "@/lib/data/models";
+import { getAuthUser } from "@/lib/auth";
 
 const db = DatabaseFactory.getDatabase();
 
 export async function GET(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const date = searchParams.get("date");
 
@@ -13,8 +19,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Simplified analytics: Just get goals for the day and aggregate statuses.
-  // A real app might allow range fetching.
-  const goals = await db.getGoalsByDate(date);
+  const goals = await db.getGoalsByDate(user.userId, date);
   
   const totalGoals = goals.length;
   const completedGoals = goals.filter((g) => g.isCompleted).length;

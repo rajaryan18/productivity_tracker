@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Event } from "@/lib/data/models";
+import { authenticatedFetch } from "@/lib/api";
 
 export default function CalendarView() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -17,7 +18,7 @@ export default function CalendarView() {
   const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/events?date=${date}`);
+      const response = await authenticatedFetch(`/api/events?date=${date}`);
       if (response.ok) {
         const data = await response.json();
         setEvents(data);
@@ -39,7 +40,7 @@ export default function CalendarView() {
 
     setIsAdding(true);
     try {
-      const response = await fetch("/api/events", {
+      const response = await authenticatedFetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date, title, description, startTime, endTime }),

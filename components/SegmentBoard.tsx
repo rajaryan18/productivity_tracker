@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Goal, TimeSegment, GoalClassification } from "@/lib/data/models";
+import { authenticatedFetch } from "@/lib/api";
 
 const SEGMENTS: TimeSegment[] = [
   "Before breakfast",
@@ -45,7 +46,7 @@ export default function SegmentBoard({ segment, goals, date, onGoalUpdated }: Se
 
     setIsAdding(true);
     try {
-      const response = await fetch("/api/goals", {
+      const response = await authenticatedFetch("/api/goals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date, segment, text: newGoalText }),
@@ -73,7 +74,7 @@ export default function SegmentBoard({ segment, goals, date, onGoalUpdated }: Se
 
   const updateGoalStatus = async (id: string, updates: Partial<Pick<Goal, "isCompleted" | "classification">>) => {
     try {
-      const response = await fetch("/api/goals", {
+      const response = await authenticatedFetch("/api/goals", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...updates }),
@@ -89,7 +90,7 @@ export default function SegmentBoard({ segment, goals, date, onGoalUpdated }: Se
 
   const handleMoveSegment = async (goal: Goal, newSegment: TimeSegment) => {
     try {
-      const response = await fetch("/api/goals", {
+      const response = await authenticatedFetch("/api/goals", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: goal.id, segment: newSegment }),
@@ -103,7 +104,7 @@ export default function SegmentBoard({ segment, goals, date, onGoalUpdated }: Se
   const handleDelete = async (goalId: string) => {
     if (!confirm("Delete this goal?")) return;
     try {
-      const response = await fetch(`/api/goals?id=${goalId}`, { method: "DELETE" });
+      const response = await authenticatedFetch(`/api/goals?id=${goalId}`, { method: "DELETE" });
       if (response.ok) onGoalUpdated();
     } catch (error) {
       console.error("Failed to delete goal:", error);

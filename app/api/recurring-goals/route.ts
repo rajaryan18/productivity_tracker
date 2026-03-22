@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DatabaseFactory } from "@/lib/data/DatabaseFactory";
 import { TimeSegment } from "@/lib/data/models";
+import { getAuthUser } from "@/lib/auth";
 
 export async function GET() {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const db = DatabaseFactory.getDatabase();
   try {
-    const recurring = await db.getRecurringGoals();
+    const recurring = await db.getRecurringGoals(user.userId);
     return NextResponse.json(recurring);
   } catch (error) {
     console.error("Failed to fetch recurring goals:", error);
@@ -14,6 +20,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const db = DatabaseFactory.getDatabase();
   try {
     const body = await request.json();
@@ -21,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (!text || !segment || !startDate) {
       return NextResponse.json({ error: "Text, segment, and startDate are required" }, { status: 400 });
     }
-    const newRG = await db.addRecurringGoal(text, segment as TimeSegment, startDate, endDate, isAlwaysRecurring);
+    const newRG = await db.addRecurringGoal(user.userId, text, segment as TimeSegment, startDate, endDate, isAlwaysRecurring);
     return NextResponse.json(newRG);
   } catch (error) {
     console.error("Failed to add recurring goal:", error);
@@ -30,6 +41,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const db = DatabaseFactory.getDatabase();
   try {
     const { searchParams } = new URL(request.url);

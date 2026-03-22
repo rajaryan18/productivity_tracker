@@ -1,7 +1,8 @@
-import { Goal, Event, TimeSegment, RecurringGoal } from "./models";
+import { Goal, Event, TimeSegment, RecurringGoal, User } from "./models";
 import { IDatabase } from "./IDatabase";
 
 export class MockDatabase implements IDatabase {
+  private users: User[] = [];
   private goals: Goal[] = [];
   private events: Event[] = [];
   private recurringGoals: RecurringGoal[] = [];
@@ -14,18 +15,40 @@ export class MockDatabase implements IDatabase {
     return Math.random().toString(36).substring(2, 9);
   }
 
+  // Users Methods
+  async addUser(userData: Omit<User, "id">): Promise<User> {
+    const newUser: User = {
+      ...userData,
+      id: this.generateId(),
+      createdAt: new Date().toISOString(),
+    };
+    this.users.push(newUser);
+    return newUser;
+  }
+
+  async getUserByEmail(email: string): Promise<User | null> {
+    return this.users.find((u) => u.email === email) || null;
+  }
+
+  async getUserById(id: string): Promise<User | null> {
+    return this.users.find((u) => u.id === id) || null;
+  }
+
   // Goals Methods
-  async getGoalsByDate(date: string): Promise<Goal[]> {
-    return this.goals.filter((goal) => goal.date === date);
+  async getGoalsByDate(userId: string, date: string): Promise<Goal[]> {
+    return this.goals.filter((goal) => goal.userId === userId && goal.date === date);
   }
 
-  async getGoalsByDateRange(startDate: string, endDate: string): Promise<Goal[]> {
-    return this.goals.filter((goal) => goal.date >= startDate && goal.date <= endDate);
+  async getGoalsByDateRange(userId: string, startDate: string, endDate: string): Promise<Goal[]> {
+    return this.goals.filter((goal) => 
+      goal.userId === userId && goal.date >= startDate && goal.date <= endDate
+    );
   }
 
-  async addGoal(date: string, segment: TimeSegment, text: string): Promise<Goal> {
+  async addGoal(userId: string, date: string, segment: TimeSegment, text: string): Promise<Goal> {
     const newGoal: Goal = {
       id: this.generateId(),
+      userId,
       date,
       segment,
       text,
@@ -55,13 +78,14 @@ export class MockDatabase implements IDatabase {
   }
 
   // Recurring Goals
-  async getRecurringGoals(): Promise<RecurringGoal[]> {
-    return this.recurringGoals;
+  async getRecurringGoals(userId: string): Promise<RecurringGoal[]> {
+    return this.recurringGoals.filter((rg) => rg.userId === userId);
   }
 
-  async addRecurringGoal(text: string, segment: TimeSegment, startDate: string, endDate?: string, isAlwaysRecurring: boolean = false): Promise<RecurringGoal> {
+  async addRecurringGoal(userId: string, text: string, segment: TimeSegment, startDate: string, endDate?: string, isAlwaysRecurring: boolean = false): Promise<RecurringGoal> {
     const newRG: RecurringGoal = {
       id: this.generateId(),
+      userId,
       text,
       segment,
       startDate,
@@ -79,14 +103,15 @@ export class MockDatabase implements IDatabase {
   }
 
   // Events Methods
-  async getEventsByDate(date: string): Promise<Event[]> {
-    return this.events.filter((event) => event.date === date);
+  async getEventsByDate(userId: string, date: string): Promise<Event[]> {
+    return this.events.filter((event) => event.userId === userId && event.date === date);
   }
 
-  async addEvent(eventData: Omit<Event, "id" | "createdAt">): Promise<Event> {
+  async addEvent(userId: string, eventData: Omit<Event, "id" | "userId" | "createdAt">): Promise<Event> {
     const newEvent: Event = {
       ...eventData,
       id: this.generateId(),
+      userId,
       createdAt: new Date().toISOString(),
     };
     this.events.push(newEvent);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DatabaseFactory } from "@/lib/data/DatabaseFactory";
 import { GoalClassification, TimeSegment } from "@/lib/data/models";
+import { getAuthUser } from "@/lib/auth";
 
 const SEGMENTS: TimeSegment[] = [
   "Before breakfast",
@@ -11,6 +12,11 @@ const SEGMENTS: TimeSegment[] = [
 ];
 
 export async function GET(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type"); // 'daily' or 'weekly'
   const date = searchParams.get("date");
@@ -23,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (type === "daily") {
       if (!date) return NextResponse.json({ error: "Date is required for daily insights" }, { status: 400 });
       
-      const goals = await db.getGoalsByDate(date);
+      const goals = await db.getGoalsByDate(user.userId, date);
       
       const segmentData = SEGMENTS.map(segment => {
         const segmentGoals = goals.filter(g => g.segment === segment && g.isCompleted);
@@ -41,7 +47,7 @@ export async function GET(request: NextRequest) {
     if (type === "weekly") {
       if (!startDate || !endDate) return NextResponse.json({ error: "startDate and endDate are required for weekly insights" }, { status: 400 });
 
-      const goals = await db.getGoalsByDateRange(startDate, endDate);
+      const goals = await db.getGoalsByDateRange(user.userId, startDate, endDate);
       
       // Get all unique dates in the range
       const dates: string[] = [];

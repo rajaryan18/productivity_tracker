@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Goal, TimeSegment } from "@/lib/data/models";
 import SegmentBoard from "./SegmentBoard";
 import Link from "next/link";
+import { authenticatedFetch } from "@/lib/api";
 
 const SEGMENTS: TimeSegment[] = [
   "Before breakfast",
@@ -27,7 +28,7 @@ export default function Dashboard() {
   const fetchGoals = useCallback(async () => {
     if (goals.length === 0) setLoading(true);
     try {
-      const response = await fetch(`/api/goals?date=${date}`);
+      const response = await authenticatedFetch(`/api/goals?date=${date}`);
       if (response.ok) {
         const data = await response.json();
         setGoals(data);
@@ -41,7 +42,7 @@ export default function Dashboard() {
 
   const fetchRecurringGoals = useCallback(async () => {
     try {
-      const response = await fetch("/api/recurring-goals");
+      const response = await authenticatedFetch("/api/recurring-goals");
       if (response.ok) setRecurringGoals(await response.json());
     } catch (error) {
       console.error("Failed to fetch recurring goals:", error);
@@ -86,7 +87,7 @@ export default function Dashboard() {
             const exists = goals.find(g => g.text === rg.text && g.segment === rg.segment);
             if (!exists) {
               needsUpdate = true;
-              await fetch("/api/goals", {
+              await authenticatedFetch("/api/goals", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ date: today, segment: rg.segment, text: rg.text }),
@@ -104,7 +105,7 @@ export default function Dashboard() {
     e.preventDefault();
     if (!newRecurringText.trim()) return;
     try {
-      const response = await fetch("/api/recurring-goals", {
+      const response = await authenticatedFetch("/api/recurring-goals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -127,7 +128,7 @@ export default function Dashboard() {
 
   const handleDeleteRecurring = async (id: string) => {
     try {
-      const response = await fetch(`/api/recurring-goals?id=${id}`, { method: "DELETE" });
+      const response = await authenticatedFetch(`/api/recurring-goals?id=${id}`, { method: "DELETE" });
       if (response.ok) fetchRecurringGoals();
     } catch (error) {
       console.error("Failed to delete recurring goal:", error);

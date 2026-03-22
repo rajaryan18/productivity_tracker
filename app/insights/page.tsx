@@ -6,6 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell
 } from "recharts";
+import { authenticatedFetch } from "@/lib/api";
 
 const COLORS = ["#10b981", "#ef4444"];
 
@@ -38,8 +39,8 @@ export default function InsightsPage() {
       setLoading(true);
       try {
         const [dailyRes, weeklyRes] = await Promise.all([
-          fetch(`/api/insights?type=daily&date=${today}`),
-          fetch(`/api/insights?type=weekly&startDate=${startDate}&endDate=${today}`)
+          authenticatedFetch(`/api/insights?type=daily&date=${today}`),
+          authenticatedFetch(`/api/insights?type=weekly&startDate=${startDate}&endDate=${today}`)
         ]);
 
         if (dailyRes.ok) setDailyData(await dailyRes.json());

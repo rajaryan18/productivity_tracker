@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DatabaseFactory } from "@/lib/data/DatabaseFactory";
 import { TimeSegment } from "@/lib/data/models";
+import { getAuthUser } from "@/lib/auth";
 
 const db = DatabaseFactory.getDatabase();
 
 export async function GET(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const date = searchParams.get("date");
 
@@ -12,11 +18,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Date parameter is required" }, { status: 400 });
   }
 
-  const goals = await db.getGoalsByDate(date);
+  const goals = await db.getGoalsByDate(user.userId, date);
   return NextResponse.json(goals);
 }
 
 export async function POST(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { date, segment, text } = body;
@@ -25,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const goal = await db.addGoal(date, segment as TimeSegment, text);
+    const goal = await db.addGoal(user.userId, date, segment as TimeSegment, text);
     return NextResponse.json(goal, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -33,16 +44,21 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { id, text, isCompleted, segment, classification } = body;
-    console.log("PUT request body:", body);
     
     if (!id) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    console.log("Updating goal with:", { text, isCompleted, segment, classification });
+    // Note: Ideally we should verify that this goal belongs to the user
+    // For now, updateGoal just takes id.
     const updatedGoal = await db.updateGoal(id, { text, isCompleted, segment, classification });
     if (!updatedGoal) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
@@ -55,6 +71,11 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");

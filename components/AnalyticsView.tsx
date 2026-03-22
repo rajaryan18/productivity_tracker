@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { authenticatedFetch } from "@/lib/api";
 
 interface AnalyticsData {
   date: string;
@@ -21,7 +22,7 @@ export default function AnalyticsView() {
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/analytics?date=${date}`);
+      const response = await authenticatedFetch(`/api/analytics?date=${date}`);
       if (response.ok) {
         setData(await response.json());
       }

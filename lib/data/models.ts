@@ -7,8 +7,17 @@ export type TimeSegment =
 
 export type GoalClassification = "productive" | "waste" | "none";
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password?: string; // Hashed password
+  createdAt: string;
+}
+
 export interface Goal {
   id: string;
+  userId: string;
   date: string; // ISO format YYYY-MM-DD
   segment: TimeSegment;
   text: string;
@@ -19,6 +28,7 @@ export interface Goal {
 
 export interface Event {
   id: string;
+  userId: string;
   date: string; // ISO format YYYY-MM-DD
   title: string;
   description?: string;
@@ -29,6 +39,7 @@ export interface Event {
 
 export interface RecurringGoal {
   id: string;
+  userId: string;
   text: string;
   segment: TimeSegment;
   startDate: string; // ISO date

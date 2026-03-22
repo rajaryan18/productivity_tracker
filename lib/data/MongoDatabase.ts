@@ -1,9 +1,17 @@
 import mongoose from "mongoose";
 import { IDatabase } from "./IDatabase";
-import { Goal, Event, TimeSegment, RecurringGoal } from "./models";
+import { Goal, Event, TimeSegment, RecurringGoal, User } from "./models";
 
 // MongoDB schemas
+const UserSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+
 const GoalSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
   date: { type: String, required: true },
   segment: { type: String, required: true },
   text: { type: String, required: true },
@@ -13,12 +21,17 @@ const GoalSchema = new mongoose.Schema({
 });
 
 const RecurringGoalSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
   text: { type: String, required: true },
   segment: { type: String, required: true },
+  startDate: { type: String, required: true },
+  endDate: String,
+  isAlwaysRecurring: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 
 const EventSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
   date: { type: String, required: true },
   title: { type: String, required: true },
   description: String,
@@ -28,6 +41,7 @@ const EventSchema = new mongoose.Schema({
 });
 
 // Models
+const UserModel = mongoose.models.User || mongoose.model("User", UserSchema);
 const GoalModel = mongoose.models.Goal || mongoose.model("Goal", GoalSchema);
 const RecurringGoalModel = mongoose.models.RecurringGoal || mongoose.model("RecurringGoal", RecurringGoalSchema);
 const EventModel = mongoose.models.Event || mongoose.model("Event", EventSchema);
@@ -70,10 +84,44 @@ export class MongoDatabase implements IDatabase {
     return Promise.resolve();
   }
 
-  // Goals Methods
-  async getGoalsByDate(date: string): Promise<Goal[]> {
+  // User Methods
+  async addUser(userData: Omit<User, "id">): Promise<User> {
     await this.ensureConnected();
-    const goals = await GoalModel.find({ date }).lean();
+    const newUser = await UserModel.create(userData);
+    return {
+      id: newUser._id.toString(),
+      name: newUser.name,
+      email: newUser.email,
+      createdAt: newUser.createdAt.toISOString(),
+    };
+  }
+
+  async getUserByEmail(email: string): Promise<User | null> {
+    await this.ensureConnected();
+    const user = await UserModel.findOne({ email }).lean();
+    if (!user) return null;
+    return {
+      ...user,
+      id: (user as any)._id.toString(),
+      createdAt: (user as any).createdAt.toISOString(),
+    };
+  }
+
+  async getUserById(id: string): Promise<User | null> {
+    await this.ensureConnected();
+    const user = await UserModel.findById(id).lean();
+    if (!user) return null;
+    return {
+      ...user,
+      id: (user as any)._id.toString(),
+      createdAt: (user as any).createdAt.toISOString(),
+    };
+  }
+
+  // Goals Methods
+  async getGoalsByDate(userId: string, date: string): Promise<Goal[]> {
+    await this.ensureConnected();
+    const goals = await GoalModel.find({ userId, date }).lean();
     return goals.map((g: any) => ({
       ...g,
       id: g._id.toString(),
@@ -81,10 +129,11 @@ export class MongoDatabase implements IDatabase {
     }));
   }
 
-  async getGoalsByDateRange(startDate: string, endDate: string): Promise<Goal[]> {
+  async getGoalsByDateRange(userId: string, startDate: string, endDate: string): Promise<Goal[]> {
     await this.ensureConnected();
-    const goals = await GoalModel.find({ 
-      date: { $gte: startDate, $lte: endDate } 
+    const goals = await GoalModel.find({
+      userId,
+      date: { $gte: startDate, $lte: endDate }
     }).lean();
     return goals.map((g: any) => ({
       ...g,
@@ -93,11 +142,12 @@ export class MongoDatabase implements IDatabase {
     }));
   }
 
-  async addGoal(date: string, segment: TimeSegment, text: string): Promise<Goal> {
+  async addGoal(userId: string, date: string, segment: TimeSegment, text: string): Promise<Goal> {
     await this.ensureConnected();
-    const newGoal = await GoalModel.create({ date, segment, text });
+    const newGoal = await GoalModel.create({ userId, date, segment, text });
     return {
       id: newGoal._id.toString(),
+      userId,
       date,
       segment,
       text,
@@ -108,7 +158,6 @@ export class MongoDatabase implements IDatabase {
 
   async updateGoal(id: string, updates: Partial<Pick<Goal, "text" | "isCompleted" | "segment" | "classification">>): Promise<Goal | null> {
     await this.ensureConnected();
-    console.log("MongoDatabase.updateGoal:", id, updates);
     const updatedGoal = await GoalModel.findByIdAndUpdate(id, updates, { new: true }).lean();
     if (!updatedGoal) return null;
     return {
@@ -125,9 +174,9 @@ export class MongoDatabase implements IDatabase {
   }
 
   // Recurring Goals Methods
-  async getRecurringGoals(): Promise<RecurringGoal[]> {
+  async getRecurringGoals(userId: string): Promise<RecurringGoal[]> {
     await this.ensureConnected();
-    const recurring = await RecurringGoalModel.find().lean();
+    const recurring = await RecurringGoalModel.find({ userId }).lean();
     return recurring.map((rg: any) => ({
       ...rg,
       id: rg._id.toString(),
@@ -135,10 +184,10 @@ export class MongoDatabase implements IDatabase {
     }));
   }
 
-  async addRecurringGoal(text: string, segment: TimeSegment, startDate: string, endDate?: string, isAlwaysRecurring: boolean = false): Promise<RecurringGoal> {
+  async addRecurringGoal(userId: string, text: string, segment: TimeSegment, startDate: string, endDate?: string, isAlwaysRecurring: boolean = false): Promise<RecurringGoal> {
     await this.ensureConnected();
-    const newRG = await RecurringGoalModel.create({ text, segment, startDate, endDate, isAlwaysRecurring });
-    
+    const newRG = await RecurringGoalModel.create({ userId, text, segment, startDate, endDate, isAlwaysRecurring });
+
     // If endDate is set, pre-populate Goal collection
     if (endDate) {
       const start = new Date(startDate);
@@ -147,7 +196,7 @@ export class MongoDatabase implements IDatabase {
       let curr = new Date(start);
       while (curr <= end) {
         const dateStr = curr.toISOString().split('T')[0];
-        promises.push(GoalModel.create({ date: dateStr, segment, text }));
+        promises.push(GoalModel.create({ userId, date: dateStr, segment, text }));
         curr.setDate(curr.getDate() + 1);
       }
       await Promise.all(promises);
@@ -155,6 +204,7 @@ export class MongoDatabase implements IDatabase {
 
     return {
       id: newRG._id.toString(),
+      userId,
       text: newRG.text,
       segment: newRG.segment,
       startDate: newRG.startDate,
@@ -171,9 +221,9 @@ export class MongoDatabase implements IDatabase {
   }
 
   // Events Methods
-  async getEventsByDate(date: string): Promise<Event[]> {
+  async getEventsByDate(userId: string, date: string): Promise<Event[]> {
     await this.ensureConnected();
-    const events = await EventModel.find({ date }).lean();
+    const events = await EventModel.find({ userId, date }).lean();
     return events.map((e: any) => ({
       ...e,
       id: e._id.toString(),
@@ -181,12 +231,13 @@ export class MongoDatabase implements IDatabase {
     }));
   }
 
-  async addEvent(eventData: Omit<Event, "id" | "createdAt">): Promise<Event> {
+  async addEvent(userId: string, eventData: Omit<Event, "id" | "userId" | "createdAt">): Promise<Event> {
     await this.ensureConnected();
-    const newEvent = await EventModel.create(eventData);
+    const newEvent = await EventModel.create({ ...eventData, userId });
     return {
       ...newEvent.toObject(),
       id: newEvent._id.toString(),
+      userId,
       createdAt: newEvent.createdAt.toISOString(),
     };
   }
