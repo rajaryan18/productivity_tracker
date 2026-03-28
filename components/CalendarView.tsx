@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Event } from "@/lib/data/models";
 import { authenticatedFetch } from "@/lib/api";
+
+const HOUR_HEIGHT = 60; // pixels
 
 export default function CalendarView() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -60,47 +62,167 @@ export default function CalendarView() {
     }
   };
 
+  const getTimeOffset = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    return (hours + minutes / 60) * HOUR_HEIGHT;
+  };
+
+  const getDurationHeight = (start: string, end: string) => {
+    const startOffset = getTimeOffset(start);
+    const endOffset = getTimeOffset(end);
+    return Math.max(endOffset - startOffset, 30); // minimum 30px height
+  };
+
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+
+  const sortedEvents = useMemo(() => {
+    return [...events].sort((a, b) => (a.startTime || "00:00").localeCompare(b.startTime || "00:00"));
+  }, [events]);
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isToday = date === new Date().toISOString().split("T")[0];
+  const currentTimeOffset = useMemo(() => {
+    if (!isToday) return -1;
+    const hours = currentTime.getHours();
+    const minutes = currentTime.getMinutes();
+    return (hours + minutes / 60) * HOUR_HEIGHT;
+  }, [currentTime, isToday]);
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", alignItems: "flex-start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: "32px", alignItems: "flex-start" }}>
       
-      {/* Left List */}
-      <div>
+      {/* Left: Time Grid */}
+      <div className="glass-panel" style={{ padding: "24px", position: "relative", overflowX: "hidden" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
           <h2 className="gradient-text" style={{ fontSize: "2rem", margin: 0 }}>Schedule</h2>
-          <input 
-            type="date" 
-            className="input-field" 
-            style={{ width: "auto" }}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <button 
+              className="tab-pill" 
+              onClick={() => setDate(new Date().toISOString().split("T")[0])}
+              style={{ padding: "6px 12px", fontSize: "0.8rem", height: "auto" }}
+            >
+              Today
+            </button>
+            <input 
+              type="date" 
+              className="input-field" 
+              style={{ width: "auto", padding: "8px 16px" }}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
         </div>
 
         {loading ? (
-          <div style={{ color: "var(--text-secondary)" }}>Loading events...</div>
-        ) : events.length === 0 ? (
-          <div className="glass-panel" style={{ textAlign: "center", color: "var(--text-secondary)" }}>
-            No events scheduled for this day.
-          </div>
+          <div style={{ color: "var(--text-secondary)", height: "400px", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading events...</div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {events.map((event) => (
-              <div key={event.id} className="glass-panel" style={{ padding: "16px" }}>
-                <h3 style={{ margin: "0 0 8px 0", color: "white" }}>{event.title}</h3>
-                {event.description && <p style={{ color: "var(--text-secondary)", margin: "0 0 12px 0", fontSize: "0.9rem" }}>{event.description}</p>}
-                
-                <div style={{ display: "flex", gap: "16px", fontSize: "0.85rem", color: "var(--accent-primary)", fontWeight: "bold" }}>
-                  {event.startTime && <span>Start: {event.startTime}</span>}
-                  {event.endTime && <span>End: {event.endTime}</span>}
-                </div>
+          <div style={{ position: "relative", marginLeft: "60px", borderLeft: "1px solid rgba(255,255,255,0.1)" }}>
+            
+            {/* Current Time Indicator */}
+            {isToday && currentTimeOffset >= 0 && (
+              <div style={{ 
+                position: "absolute", 
+                top: `${currentTimeOffset}px`, 
+                left: "-5px", 
+                right: 0, 
+                height: "2px", 
+                backgroundColor: "#ef4444", 
+                zIndex: 50,
+                pointerEvents: "none"
+              }}>
+                <div style={{ 
+                  position: "absolute", 
+                  left: "-10px", 
+                  top: "-4px", 
+                  width: "10px", 
+                  height: "10px", 
+                  borderRadius: "50%", 
+                  backgroundColor: "#ef4444" 
+                }} />
+              </div>
+            )}
+
+            {/* Hour Grid Lines */}
+            {hours.map((hour) => (
+              <div key={hour} style={{ height: `${HOUR_HEIGHT}px`, borderBottom: "1px solid rgba(255,255,255,0.05)", position: "relative" }}>
+                <span style={{ 
+                  position: "absolute", 
+                  left: "-60px", 
+                  top: "-10px", 
+                  fontSize: "0.80rem", 
+                  color: "var(--text-secondary)", 
+                  width: "50px", 
+                  textAlign: "right",
+                  fontVariantNumeric: "tabular-nums"
+                }}>
+                  {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
+                </span>
               </div>
             ))}
+
+            {/* Events Area */}
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+              {sortedEvents.map((event) => {
+                if (!event.startTime || !event.endTime) return null;
+                const top = getTimeOffset(event.startTime);
+                const height = getDurationHeight(event.startTime, event.endTime);
+                
+                return (
+                  <div 
+                    key={event.id} 
+                    className="glass-panel"
+                    style={{ 
+                      position: "absolute", 
+                      top: `${top}px`, 
+                      height: `${height}px`, 
+                      left: "4px", 
+                      right: "4px", 
+                      padding: "8px 12px", 
+                      zIndex: 10,
+                      backgroundColor: "rgba(var(--accent-primary-rgb), 0.15)",
+                      borderLeft: "4px solid var(--accent-primary)",
+                      overflow: "hidden",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: height < 40 ? "center" : "flex-start"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "scale(1.02)";
+                      e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.4)";
+                      e.currentTarget.style.zIndex = "20";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.boxShadow = "none";
+                      e.currentTarget.style.zIndex = "10";
+                    }}
+                  >
+                    <div style={{ fontWeight: "bold", fontSize: "0.9rem", color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {event.title}
+                    </div>
+                    {height > 50 && (
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "2px" }}>
+                        {event.startTime} - {event.endTime}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Right Form */}
-      <div className="glass-panel" style={{ position: "sticky", top: "100px" }}>
+      {/* Right: Add Event Form */}
+      <div className="glass-panel" style={{ position: "sticky", top: "100px", padding: "24px" }}>
         <h3 style={{ margin: "0 0 24px 0", color: "white" }}>Add Event</h3>
         <form onSubmit={handleAddEvent} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div>
@@ -111,6 +233,7 @@ export default function CalendarView() {
               value={title} 
               onChange={(e) => setTitle(e.target.value)} 
               required 
+              placeholder="Deep Work Session"
             />
           </div>
           
@@ -122,6 +245,7 @@ export default function CalendarView() {
               value={description} 
               onChange={(e) => setDescription(e.target.value)} 
               style={{ resize: "vertical" }}
+              placeholder="Focus on the core engine refactoring"
             />
           </div>
 
