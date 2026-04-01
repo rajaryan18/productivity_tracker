@@ -24,6 +24,8 @@ export default function Dashboard() {
   const [newRecurringStart, setNewRecurringStart] = useState(new Date().toISOString().split("T")[0]);
   const [newRecurringEnd, setNewRecurringEnd] = useState("");
   const [isAlwaysRecurring, setIsAlwaysRecurring] = useState(true);
+  const [isAddingRecurring, setIsAddingRecurring] = useState(false);
+  const [deletingRecurringId, setDeletingRecurringId] = useState<string | null>(null);
 
   const fetchGoals = useCallback(async () => {
     if (goals.length === 0) setLoading(true);
@@ -104,6 +106,7 @@ export default function Dashboard() {
   const handleAddRecurring = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRecurringText.trim()) return;
+    setIsAddingRecurring(true);
     try {
       const response = await authenticatedFetch("/api/recurring-goals", {
         method: "POST",
@@ -123,13 +126,18 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error("Failed to add recurring goal:", error);
+    } finally {
+      setIsAddingRecurring(false);
     }
   };
 
   const handleDeleteRecurring = async (id: string) => {
     try {
       const response = await authenticatedFetch(`/api/recurring-goals?id=${id}`, { method: "DELETE" });
-      if (response.ok) fetchRecurringGoals();
+      if (response.ok) {
+        setDeletingRecurringId(null);
+        fetchRecurringGoals();
+      }
     } catch (error) {
       console.error("Failed to delete recurring goal:", error);
     }
@@ -283,22 +291,63 @@ export default function Dashboard() {
                 <input type="checkbox" checked={isAlwaysRecurring} onChange={e => setIsAlwaysRecurring(e.target.checked)} />
                 Always recurring
               </label>
-              <button type="submit" className="primary-button" style={{ width: "100%", marginTop: "12px" }}>Schedule Recurring Task</button>
+              <button 
+                type="submit" 
+                className="primary-button" 
+                style={{ width: "100%", marginTop: "12px", opacity: isAddingRecurring ? 0.7 : 1, cursor: isAddingRecurring ? "not-allowed" : "pointer" }}
+                disabled={isAddingRecurring}
+              >
+                {isAddingRecurring ? "Scheduling..." : "Schedule Recurring Task"}
+              </button>
             </form>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {recurringGoals.map(rg => (
-                <div key={rg.id} className="glass-panel" style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)" }}>
-                  <div>
-                    <div style={{ fontWeight: "600" }}>{rg.text}</div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                      {rg.segment} • {rg.isAlwaysRecurring ? "Always" : `${rg.startDate} to ${rg.endDate}`}
+                <div key={rg.id} className="glass-panel" style={{ 
+                  padding: "16px", 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center", 
+                  background: "rgba(255,255,255,0.03)",
+                  position: "relative",
+                  overflow: "hidden"
+                }}>
+                  {deletingRecurringId === rg.id ? (
+                    <div style={{ 
+                      width: "100%", 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "center",
+                      animation: "fade-in 0.2s ease"
+                    }}>
+                      <span style={{ fontSize: "0.9rem", color: "#fca5a5", fontWeight: "500" }}>Confirm delete?</span>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button 
+                          onClick={() => handleDeleteRecurring(rg.id)}
+                          style={{ background: "#ef4444", color: "white", border: "none", padding: "6px 12px", borderRadius: "8px", fontSize: "0.8rem", cursor: "pointer", fontWeight: "600" }}
+                        >Yes, delete</button>
+                        <button 
+                          onClick={() => setDeletingRecurringId(null)}
+                          style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "none", padding: "6px 12px", borderRadius: "8px", fontSize: "0.8rem", cursor: "pointer" }}
+                        >Cancel</button>
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteRecurring(rg.id)}
-                    style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "8px" }}
-                  >✕</button>
+                  ) : (
+                    <>
+                      <div>
+                        <div style={{ fontWeight: "600" }}>{rg.text}</div>
+                        <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                          {rg.segment} • {rg.isAlwaysRecurring ? "Always" : `${rg.startDate} to ${rg.endDate}`}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setDeletingRecurringId(rg.id)}
+                        style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "8px", opacity: 0.6 }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+                        onMouseLeave={e => e.currentTarget.style.opacity = "0.6"}
+                      >✕</button>
+                    </>
+                  )}
                 </div>
               ))}
               {recurringGoals.length === 0 && (

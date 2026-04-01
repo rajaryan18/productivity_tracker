@@ -39,6 +39,7 @@ export default function SegmentBoard({ segment, goals, date, onGoalUpdated }: Se
   const [newGoalText, setNewGoalText] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [classifyingGoalId, setClassifyingGoalId] = useState<string | null>(null);
+  const [deletingGoalId, setDeletingGoalId] = useState<string | null>(null);
 
   const handleAddGoal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,10 +103,12 @@ export default function SegmentBoard({ segment, goals, date, onGoalUpdated }: Se
   };
 
   const handleDelete = async (goalId: string) => {
-    if (!confirm("Delete this goal?")) return;
     try {
       const response = await authenticatedFetch(`/api/goals?id=${goalId}`, { method: "DELETE" });
-      if (response.ok) onGoalUpdated();
+      if (response.ok) {
+        setDeletingGoalId(null);
+        onGoalUpdated();
+      }
     } catch (error) {
       console.error("Failed to delete goal:", error);
     }
@@ -215,7 +218,7 @@ export default function SegmentBoard({ segment, goals, date, onGoalUpdated }: Se
                 </select>
 
                 <button 
-                  onClick={() => handleDelete(goal.id)}
+                  onClick={() => setDeletingGoalId(goal.id)}
                   style={{ 
                     background: "transparent", 
                     border: "none", 
@@ -234,6 +237,31 @@ export default function SegmentBoard({ segment, goals, date, onGoalUpdated }: Se
                 </button>
               </div>
             </div>
+
+            {deletingGoalId === goal.id && (
+              <div className="animate-fade-in" style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center",
+                marginTop: "4px", 
+                padding: "8px 12px", 
+                background: "rgba(239, 68, 68, 0.05)", 
+                borderRadius: "12px",
+                border: "1px solid rgba(239, 68, 68, 0.1)"
+              }}>
+                <span style={{ fontSize: "0.85rem", color: "#fca5a5", fontWeight: "500" }}>Delete this task?</span>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button 
+                    onClick={() => handleDelete(goal.id)}
+                    style={{ background: "#ef4444", color: "white", border: "none", padding: "4px 10px", borderRadius: "6px", fontSize: "0.75rem", cursor: "pointer", fontWeight: "600" }}
+                  >Delete</button>
+                  <button 
+                    onClick={() => setDeletingGoalId(null)}
+                    style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "none", padding: "4px 10px", borderRadius: "6px", fontSize: "0.75rem", cursor: "pointer" }}
+                  >Cancel</button>
+                </div>
+              </div>
+            )}
 
             {classifyingGoalId === goal.id && (
               <div className="animate-fade-in" style={{ 

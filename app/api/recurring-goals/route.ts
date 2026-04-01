@@ -32,6 +32,20 @@ export async function POST(request: NextRequest) {
     if (!text || !segment || !startDate) {
       return NextResponse.json({ error: "Text, segment, and startDate are required" }, { status: 400 });
     }
+    // Check for existing recurring goal to ensure idempotency (especially for infinite ones)
+    const existingRecurring = await db.getRecurringGoals(user.userId);
+    const duplicate = existingRecurring.find(rg => 
+      rg.text === text && 
+      rg.segment === segment && 
+      rg.isAlwaysRecurring === isAlwaysRecurring &&
+      rg.startDate === startDate &&
+      rg.endDate === endDate
+    );
+    
+    if (duplicate) {
+      return NextResponse.json(duplicate, { status: 200 });
+    }
+
     const newRG = await db.addRecurringGoal(user.userId, text, segment as TimeSegment, startDate, endDate, isAlwaysRecurring);
     return NextResponse.json(newRG);
   } catch (error) {

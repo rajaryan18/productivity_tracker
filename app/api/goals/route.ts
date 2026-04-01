@@ -36,6 +36,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Check for existing goal to ensure idempotency
+    const existingGoals = await db.getGoalsByDate(user.userId, date);
+    const duplicate = existingGoals.find(g => g.text === text && g.segment === segment);
+    if (duplicate) {
+      return NextResponse.json(duplicate, { status: 200 });
+    }
+
     const goal = await db.addGoal(user.userId, date, segment as TimeSegment, text);
     return NextResponse.json(goal, { status: 201 });
   } catch (error) {
